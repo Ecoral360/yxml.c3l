@@ -686,4 +686,4 @@ fn void? XmlWriter.close(&self) @dynamic
 
 
 module std::encoding::xml::internal @private;
-$exec("parser.c3", { "state", "yxml.c3.in" });
+$exec("yxml-gen.c3", { "yxml-states", "yxml.c3.in" });

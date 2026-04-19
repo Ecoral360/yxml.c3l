@@ -1,12 +1,11 @@
 <*
- Yxml in c3 (https://dev.yorhel.nl/yxml), by Manu Linares
+ Yxml in c3 (https://dev.yorhel.nl/yxml), by Manu Linares (with codegen tool by Mathis Laroche)
 
  (https://code.blicky.net/yorhel/yxml/src/branch/master/yxml.c)
  (https://code.blicky.net/yorhel/yxml/src/branch/master/yxml.h)
 
  I did my best to do a mostly one to one translation of the yxml C source to C3.
 *>
-// module std::encoding::xml::internal @private;
 
 constdef Ret
 {
