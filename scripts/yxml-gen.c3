@@ -125,6 +125,7 @@ fn void main(String[] args) {
 
   DString s_states;
   foreach (state_key : states.keys(tmem)) {
+    s_states.append("\t");
     s_states.append(state_key.to_upper_copy(tmem));
     s_states.append(",\n");
   }

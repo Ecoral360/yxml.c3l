@@ -110,7 +110,7 @@ fn String Parser.data_view(&self) @inline => ((ZString)&self.data[0]).str_view()
 enum State : int
 {
 	STRING,
-  /*=STATES=*/
+/*=STATES=*/
 }
 
 macro bool isChar(uint c) => true;
