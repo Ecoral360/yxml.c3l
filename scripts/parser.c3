@@ -10,12 +10,16 @@ fn String condtoc(String cond) {
 
   switch {
     case cond[0] == '$':
-      return string::tformat("x.%s = ch", cond[1..]);
+      return string::tformat("x.%s == ch", cond[1..]);
     case cond[0] == '\'':
-      return string::tjoin(cond.tsplit("|"), " || ");
+      String[] parts = cond.tsplit("|");
+      foreach (&part : parts) {
+        *part = string::tformat("ch == %s", *part);
+      }
+      return string::tjoin(parts, " || ");
 
     case array::@all(cond, fn(c,a) => ascii::is_alpha(c) || ascii::is_digit(c) || c == '_'):
-      return string::tformat("yxml_is%s(ch)", cond);
+      return string::tformat("is%s(ch)", cond);
   }
 
   abort("Unkown condition: %s", cond);
@@ -31,26 +35,26 @@ fn String[] acttoc(String *next, String[] act) {
       case part[0] == '$':
         c.push(string::tformat("x.%s = ch;", part[1..]));
       case part[0] == '@':
-        c.push(string::tformat("x.nextstate = YXMLS_%s;", part[1..].to_upper_copy(tmem)));
+        c.push(string::tformat("x.nextstate = %s;", part[1..].to_upper_copy(tmem)));
       case part[0] == '"':
-        c.push(string::tformat("x.nextstate = YXMLS_%s;", next.to_upper_copy(tmem)));
+        c.push(string::tformat("x.nextstate = %s;", next.to_upper_copy(tmem)));
         c.push(string::tformat("x.string = %s;", part));
         *next = "string";
 
       case array::@all(part, fn(c,a) => ascii::is_alpha(c) || ascii::is_digit(c) || c == '_'):
         if (r != "") abort(string::tformat("Only one function please '%s' !", act));
-        r = string::tformat("yxml_%s(x, ch)", part);
+        r = string::tformat("%s(x, ch)", part);
     }
   }
 
-  c.push(string::tformat("return %s;", r == "" ? "YXML_OK" : r));
+  c.push(string::tformat("return %s;", r == "" ? "OK" : r));
 
   return c.to_array(tmem);
 }
 
 fn String gen_code(String state, String[] descs) {
   List{String} code;
-  code.push(string::tformat("case YxmlState.YXMLS_%s:", state.to_upper_copy(tmem)));
+  code.push(string::tformat("case State.%s:", state.to_upper_copy(tmem)));
 
   foreach (desc : descs) {
     desc = desc.trim();
@@ -69,7 +73,7 @@ fn String gen_code(String state, String[] descs) {
       case next == "@":
         code.push("\t\tx.state = x.nextstate;");
       case next != state:
-        code.push(string::tformat("\t\tx.state = YXMLS_%s;", next.to_upper_copy(tmem)));
+        code.push(string::tformat("\t\tx.state = %s;", next.to_upper_copy(tmem)));
     }
 
     foreach (line : act) {
@@ -78,6 +82,10 @@ fn String gen_code(String state, String[] descs) {
 
     code.push("}");
 
+  }
+
+  foreach (&line : code) {
+    *line = string::tformat("\t\t%s", *line);
   }
 
   return string::tjoin(code.to_array(tmem), "\n");
@@ -116,7 +124,6 @@ fn void main(String[] args) {
 
   DString s_states;
   foreach (state_key : states.keys(tmem)) {
-    s_states.append("YXMLS_");
     s_states.append(state_key.to_upper_copy(tmem));
     s_states.append(",\n");
   }
