@@ -1,0 +1,116 @@
+constdef YxmlRet {
+	YXML_EEOF        = -5, /* Unexpected EOF                             */
+	YXML_EREF        = -4, /* Invalid character or entity reference (&whatever;) */
+	YXML_ECLOSE      = -3, /* Close tag does not match open tag (<Tag> .. </OtherTag>) */
+	YXML_ESTACK      = -2, /* Stack overflow (too deeply nested tags or too long element/attribute name) */
+	YXML_ESYN        = -1, /* Syntax error (unexpected byte)             */
+	YXML_OK          =  0, /* Character consumed, no new token present   */
+	YXML_ELEMSTART   =  1, /* Start of an element:   '<Tag ..'           */
+	YXML_CONTENT     =  2, /* Element content                            */
+	YXML_ELEMEND     =  3, /* End of an element:     '.. />' or '</Tag>' */
+	YXML_ATTRSTART   =  4, /* Attribute:             'Name=..'           */
+	YXML_ATTRVAL     =  5, /* Attribute value                            */
+	YXML_ATTREND     =  6, /* End of attribute       '.."'               */
+	YXML_PISTART     =  7, /* Start of a processing instruction          */
+	YXML_PICONTENT   =  8, /* Content of a PI                            */
+	YXML_PIEND       =  9  /* End of a processing instruction            */
+} 
+
+struct Yxml {
+	/* PUBLIC (read-only) */
+
+	/* Name of the current element, zero-length if not in any element. Changed
+	 * after YXML_ELEMSTART. The pointer will remain valid up to and including
+	 * the next non-YXML_ATTR* token, the pointed-to buffer will remain valid
+	 * up to and including the YXML_ELEMEND for the corresponding element. */
+	char *elem;
+
+	/* The last read character(s) of an attribute value (YXML_ATTRVAL), element
+	 * data (YXML_CONTENT), or processing instruction (YXML_PICONTENT). Changed
+	 * after one of the respective YXML_ values is returned, and only valid
+	 * until the next yxml_parse() call. Usually, this string only consists of
+	 * a single byte, but multiple bytes are returned in the following cases:
+	 * - "<?SomePI ?x ?>": The two characters "?x"
+	 * - "<![CDATA[ ]x ]]>": The two characters "]x"
+	 * - "<![CDATA[ ]]x ]]>": The three characters "]]x"
+	 * - "&#N;" and "&#xN;", where dec(n) > 127. The referenced Unicode
+	 *   character is then encoded in multiple UTF-8 bytes.
+	 */
+	char[8] data;
+
+	/* Name of the current attribute. Changed after YXML_ATTRSTART, valid up to
+	 * and including the next YXML_ATTREND. */
+	char *attr;
+
+	/* Name/target of the current processing instruction, zero-length if not in
+	 * a PI. Changed after YXML_PISTART, valid up to (but excluding)
+	 * the next YXML_PIEND. */
+	char *pi;
+
+	/* Line number, byte offset within that line, and total bytes read. These
+	 * values refer to the position _after_ the last byte given to
+	 * yxml_parse(). These are useful for debugging and error reporting. */
+	ulong byte;
+	ulong total;
+	uint line;
+
+
+	/* PRIVATE */
+	YxmlState state;
+	char *stack; /* Stack of element names + attribute/PI name, separated by \0. Also starts with a \0. */
+	isz stacksize, stacklen;
+	usz reflen;
+	usz quote;
+	YxmlState nextstate; /* Used for '@' state remembering and for the "string" consuming state */
+	usz ignore;
+	char *string;
+}
+
+enum YxmlState {
+  YXMLS_STRING,
+  /*=STATES=*/
+}
+
+
+fn YxmlRet yxml_parse(Yxml *x, int _ch) {
+  /* Ensure that characters are in the range of 0..255 rather than -126..125.
+   * All character comparisons are done with positive integers. */
+  usz ch = (usz)(_ch+256) & 0xff;
+  if(!ch) { 
+    return YXML_ESYN;
+  }
+  x.total++;
+
+  /* End-of-Line normalization, "\rX", "\r\n" and "\n" are recognized and
+   * normalized to a single '\n' as per XML 1.0 section 2.11. XML 1.1 adds
+   * some non-ASCII character sequences to this list, but we can only handle
+   * ASCII here without making assumptions about the input encoding. */
+  if(x.ignore == ch) {
+    x.ignore = 0;
+    return YXML_OK;
+  }
+  x.ignore = ((usz) (ch == 0xd)) * 0xa;
+  if(ch == 0xa || ch == 0xd) {
+    ch = 0xa;
+    x.line++;
+    x.byte = 0;
+  }
+  x.byte++;
+
+  switch((YxmlState)x.state) {
+    case YXMLS_STRING:
+      if(ch == *x.string) {
+        x.string++;
+        if(!*x.string) {
+          x.state = x.nextstate;
+        }
+        return YXML_OK;
+      }
+      break;
+    /*=SWITCH=*/
+  }
+  return YXML_ESYN;
+}
+
+
+
